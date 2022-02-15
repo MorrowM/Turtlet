@@ -7,10 +7,30 @@ module Wordle
   , WordletType(..)
   ) where
 
+import           Colourista                     ( blue
+                                                , bold
+                                                , cyan
+                                                , formatWith
+                                                , green
+                                                , magenta
+                                                , red
+                                                , reset
+                                                )
+import           Control.Concurrent             ( ThreadId
+                                                , forkIO
+                                                , killThread
+                                                , threadDelay
+                                                )
+import           Control.Exception              ( evaluate )
+import           Control.Monad                  ( forever
+                                                , void
+                                                )
+import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import           Data.Char                      ( isAsciiLower
                                                 , toLower
                                                 )
 import           Data.Coerce                    ( coerce )
+import           Data.Foldable                  ( for_ )
 import           Data.Function                  ( on )
 import           Data.Kind                      ( Type )
 import           Data.List                      ( delete
@@ -31,11 +51,26 @@ import           Data.Traversable               ( mapAccumL )
 import qualified Data.Vector                   as VV
 import           Data.Vector.Sized              ( Vector )
 import qualified Data.Vector.Sized             as V
+import           GHC.IO.Handle                  ( hFlush )
 import           GHC.TypeNats                   ( type (-)
                                                 , type (<=)
                                                 , KnownNat
                                                 )
+import           System.Console.ANSI            ( clearLine
+                                                , hideCursor
+                                                , showCursor
+                                                )
+import           System.Console.Haskeline       ( InputT
+                                                , defaultSettings
+                                                , getInputLine
+                                                , handleInterrupt
+                                                , outputStr
+                                                , outputStrLn
+                                                , runInputT
+                                                , withInterrupt
+                                                )
 import           System.Exit                    ( exitSuccess )
+import           System.IO                      ( stdout )
 
 data WordletType = Guess | Master
 
@@ -133,7 +168,17 @@ bestGuess (WordList guesses) masters = case VV.toList $ getWordList masters of
   [x] -> coerce x
   [x, _] -> coerce x
   _ -> preferMaster masters . selectBestCandidates score . VV.toList $ guesses
-  where score guess = maximum (makeHitMap guess masters)
+ where
+  score guess =
+    maximum
+      $ let hitmap = makeHitMap guess masters
+            result | null hitmap = guessNotFound
+                   | otherwise   = hitmap
+        in  result
+
+guessNotFound :: a
+guessNotFound = errorWithoutStackTrace
+  $ formatWith [red, bold] "Error: Couldn't find a candidate guess!"
 
 preferMaster :: WordList Master -> NonEmpty (Wordlet Guess) -> Wordlet Guess
 preferMaster masters =
@@ -147,7 +192,7 @@ selectBestCandidates score guesses = result
   sortedByScore   = sortOn snd taggedWithScore
   bestScoreGroup  = case NE.groupBy ((==) `on` snd) sortedByScore of
     (best : _rest) -> best
-    []             -> error "Couldn't find a candidate guess!"
+    []             -> guessNotFound
   result = fmap fst bestScoreGroup
 
 makeHitMap :: Wordlet Guess -> WordList Master -> Map Colors Int
@@ -159,31 +204,81 @@ filterMasters colors guess (WordList masters) =
   WordList $ VV.filter (consistentWith colors guess) masters
 
 runGame :: WordList Guess -> WordList Master -> IO ()
-runGame guesses masters = do
-  putStrLn "Do you have a starter word you'd like to use?"
-  usrInput <- Text.getLine
-  case parseWordlet usrInput of
-    Right guess -> singleRound guess masters >>= gameLoop
-    Left  _     -> gameLoop masters
+runGame guesses masters =
+  handleInterrupt exitSuccess
+    $ runInputT defaultSettings
+    $ withInterrupt
+    $ runGame' guesses masters
+
+runGame' :: WordList 'Guess -> WordList 'Master -> InputT IO a
+runGame' guesses masters = do
+  outputStrLn
+    $ question
+        "Do you have a starter word you'd like to use? (type \"no\" to generate it)"
+  let inputLoop = do
+        usrInput <- fmap Text.pack <$> getInputLine "> "
+        case parseWordlet <$> usrInput of
+          Just (Right guess) -> singleRound guess masters >>= gameLoop
+          _ | Just u <- usrInput, Text.map toLower u `elem` ["n", "no"] ->
+            gameLoop masters
+          _ -> inputLoop
+  inputLoop
  where
   singleRound guess currentMasters = do
-    putStrLn "What was the result?"
-    let inputLoop = do
-          usrInput <- Text.getLine
-          case parseColors usrInput of
-            Left err -> if usrInput == "done"
-              then do
-                putStrLn "Congrats!"
-                exitSuccess
-              else Text.putStrLn err *> inputLoop
-            Right colors -> do
-              let newMasters = filterMasters colors guess currentMasters
-              pure newMasters
+    outputStrLn $ question
+      "What was the result? (type \"done\" if the guess was correct)"
+    let
+      inputLoop = do
+        usrInput <- fmap Text.pack <$> getInputLine "> "
+        case parseColors <$> usrInput of
+          Just (Right colors) -> do
+            let newMasters = filterMasters colors guess currentMasters
+            pure newMasters
+          _ | usrInput == Just "done" -> do
+            outputStrLn $ formatWith [green, bold] "Congratulations!"
+            outputStrLn $ question "Would you like to play again?"
+            let
+              inputLoop' = do
+                usrInput' <- fmap Text.pack <$> getInputLine "> "
+                case usrInput' of
+                  Just s
+                    | Text.map toLower s `elem` ["y", "yes"] -> runGame'
+                      guesses
+                      masters
+                    | Text.map toLower s `elem` ["n", "no"] -> liftIO
+                      exitSuccess
+                  Nothing -> inputLoop'
+                  _       -> outputStrLn "Sorry, didn't get that." *> inputLoop'
+            inputLoop'
+          Nothing         -> inputLoop
+          Just (Left err) -> outputStrLn (Text.unpack err) *> inputLoop
+
     inputLoop
 
   gameLoop currentMasters = do
     let guess = bestGuess guesses currentMasters
-    putStrLn "Thinking..."
-    putStrLn $ "Guess this word: " <> show guess
+    outputStr blue
+    liftIO hideCursor
+    threadid <- liftIO $ loadingEllipse "  🧠 Thinking"
+    _        <- liftIO $ evaluate guess
+    liftIO $ killThread threadid
+    liftIO showCursor
+    outputStr $ reset <> "\n"
+    outputStrLn $ formatWith [cyan] $ "Guess this word: " <> formatWith
+      [bold]
+      (show guess)
     newMasters <- singleRound guess currentMasters
     gameLoop newMasters
+
+
+  question s = formatWith [magenta] $ "⇛  " <> s
+
+loadingEllipse :: Text -> IO ThreadId
+loadingEllipse prefix = forkIO $ forever $ for_ [0 .. 3] $ \n ->
+  once (Text.replicate n ".")
+ where
+  once s = do
+    void $ threadDelay 300000
+    clearLine
+    Text.putStr $ "\r" <> prefix <> s
+    hFlush stdout

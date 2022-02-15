@@ -2,6 +2,7 @@ module Main where
 
 import           Wordle
 
+import           Colourista
 import           Control.Monad                  ( (<=<) )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
@@ -17,8 +18,15 @@ fetchWordList = rightOrDie . parseWordList <=< T.readFile
 
 main :: IO ()
 main = do
-  putStrLn "=== Welcome to Wordle solver 3000! ==="
+  greenMessage
+    "\n\n\n\
+    \        ┌────────────────────────────────────┐       .==.    \n\
+    \        │ Welcome to Turtlet, a Wordle Solver│    __/-^-^\\  \n\
+    \        └────────────────────────────────────┘   (' )^-^-^\\)\n\
+    \                                                  `^UU^^UU^"
+  infoMessage " Press Ctrl-C to exit at any time."
+  infoMessage " Type \"done\" once you've guessed successfully.\n"
   masterWords <- fetchWordList @Master "data/master-words.txt"
   guessWords  <- fetchWordList @Guess "data/guess-words.txt"
-  runGame guessWords masterWords -- (unsafeCoerce possibleWords)
+  runGame guessWords masterWords
 
