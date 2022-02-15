@@ -12,14 +12,16 @@ executable turtlet
   other-modules:      Wordle
   build-depends:
     , ansi-terminal
+    , async
     , base                       ^>=4.14
     , colourista
-    , containers                 ^>=0.6
-    , ghc-typelits-natnormalise  ^>=0.7
+    , containers
+    , file-embed
+    , ghc-typelits-natnormalise
     , haskeline
     , text
-    , vector                     ^>=0.12
-    , vector-sized               ^>=1.5
+    , vector
+    , vector-sized
 
   default-extensions:
     AllowAmbiguousTypes
@@ -27,6 +29,7 @@ executable turtlet
     OverloadedStrings
     ScopedTypeVariables
     StandaloneKindSignatures
+    TemplateHaskell
     TupleSections
     TypeApplications
     TypeFamilies

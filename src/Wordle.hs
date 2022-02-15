@@ -16,12 +16,14 @@ import           Colourista                     ( blue
                                                 , red
                                                 , reset
                                                 )
-import           Control.Concurrent             ( ThreadId
-                                                , forkIO
-                                                , killThread
-                                                , threadDelay
+import           Control.Concurrent             ( threadDelay )
+import           Control.Concurrent.Async       ( AsyncCancelled
+                                                , cancel
+                                                , withAsync
                                                 )
-import           Control.Exception              ( evaluate )
+import           Control.Exception              ( catch
+                                                , evaluate
+                                                )
 import           Control.Monad                  ( forever
                                                 , void
                                                 )
@@ -258,11 +260,9 @@ runGame' guesses masters = do
   gameLoop currentMasters = do
     let guess = bestGuess guesses currentMasters
     outputStr blue
-    liftIO hideCursor
-    threadid <- liftIO $ loadingEllipse "  🧠 Thinking"
-    _        <- liftIO $ evaluate guess
-    liftIO $ killThread threadid
-    liftIO showCursor
+    liftIO $ withAsync (loadingEllipse "  🧠 Thinking") $ \a -> do
+      _ <- evaluate guess
+      cancel a
     outputStr $ reset <> "\n"
     outputStrLn $ formatWith [cyan] $ "Guess this word: " <> formatWith
       [bold]
@@ -273,10 +273,13 @@ runGame' guesses masters = do
 
   question s = formatWith [magenta] $ "⇛  " <> s
 
-loadingEllipse :: Text -> IO ThreadId
-loadingEllipse prefix = forkIO $ forever $ for_ [0 .. 3] $ \n ->
-  once (Text.replicate n ".")
+loadingEllipse :: Text -> IO ()
+loadingEllipse prefix = (hideCursor *> loop)
+  `catch` \(_ :: AsyncCancelled) -> once "..." *> showCursor
+
  where
+  loop = forever $ for_ [0 .. 3] $ \n -> once (Text.replicate n ".")
+
   once s = do
     void $ threadDelay 300000
     clearLine

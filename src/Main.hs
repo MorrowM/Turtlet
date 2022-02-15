@@ -3,18 +3,22 @@ module Main where
 import           Wordle
 
 import           Colourista
-import           Control.Monad                  ( (<=<) )
+import           Data.FileEmbed
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import qualified Data.Text.IO                  as T
-import           System.Exit                    ( die )
 
 
-rightOrDie :: Either Text a -> IO a
-rightOrDie = either (die . T.unpack . ("error: " <>)) pure
+rightOrDie :: Either Text a -> a
+rightOrDie = either (error . T.unpack . ("error: " <>)) id
 
-fetchWordList :: FilePath -> IO (WordList wlty)
-fetchWordList = rightOrDie . parseWordList <=< T.readFile
+embedWordList :: Text -> WordList wlty
+embedWordList = rightOrDie . parseWordList
+
+masterWords :: WordList Master
+masterWords = embedWordList $(embedStringFile "data/master-words.txt")
+
+guessWords :: WordList Guess
+guessWords = embedWordList $(embedStringFile "data/guess-words.txt")
 
 main :: IO ()
 main = do
@@ -26,7 +30,5 @@ main = do
     \                                                  `^UU^^UU^"
   infoMessage " Press Ctrl-C to exit at any time."
   infoMessage " Type \"done\" once you've guessed successfully.\n"
-  masterWords <- fetchWordList @Master "data/master-words.txt"
-  guessWords  <- fetchWordList @Guess "data/guess-words.txt"
   runGame guessWords masterWords
 
