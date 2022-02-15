@@ -1,11 +1,12 @@
-cabal-version: 3.0
-name:          turtlet
-version:       0.1.0.0
+cabal-version:      3.0
+name:               turtlet
+version:            0.1.0.0
 synopsis:
-license:       MIT
-license-file:  LICENSE
-author:        Morrow
-maintainer:    themorrowm@gmail.com
+license:            MIT
+license-file:       LICENSE
+author:             Morrow
+maintainer:         themorrowm@gmail.com
+extra-source-files: data/*.txt
 
 executable turtlet
   main-is:            Main.hs
@@ -26,6 +27,7 @@ executable turtlet
   default-extensions:
     AllowAmbiguousTypes
     DataKinds
+    MultiWayIf
     OverloadedStrings
     ScopedTypeVariables
     StandaloneKindSignatures

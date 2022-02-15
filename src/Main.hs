@@ -18,17 +18,19 @@ masterWords :: WordList Master
 masterWords = embedWordList $(embedStringFile "data/master-words.txt")
 
 guessWords :: WordList Guess
-guessWords = embedWordList $(embedStringFile "data/guess-words.txt")
+guessWords =
+  embedWordList
+    $  $(embedStringFile "data/guess-words.txt")
+    <> $(embedStringFile "data/master-words.txt")
 
 main :: IO ()
 main = do
   greenMessage
-    "\n\n\n\
+    "\n\n\
     \        ┌────────────────────────────────────┐       .==.    \n\
     \        │ Welcome to Turtlet, a Wordle Solver│    __/-^-^\\  \n\
     \        └────────────────────────────────────┘   (' )^-^-^\\)\n\
-    \                                                  `^UU^^UU^"
+    \                                                  `^UU^^UU^  \n"
   infoMessage " Press Ctrl-C to exit at any time."
-  infoMessage " Type \"done\" once you've guessed successfully.\n"
   runGame guessWords masterWords
 
