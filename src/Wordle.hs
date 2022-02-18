@@ -5,6 +5,8 @@ module Wordle
   , WordList
   , runGame
   , WordletType(..)
+  , simulateGame
+  , selectRandomWord
   ) where
 
 import           Colourista                     ( blue
@@ -73,6 +75,7 @@ import           System.Console.Haskeline       ( InputT
                                                 )
 import           System.Exit                    ( exitSuccess )
 import           System.IO                      ( stdout )
+import           System.Random                  ( randomRIO )
 
 -- | A tag specifying whether a type represents a master word or a guess word.
 -- Intended to be used with the @DataKinds@ language extension.
@@ -326,3 +329,28 @@ loadingEllipse prefix = (hideCursor *> loop)
     clearLine
     Text.putStr $ "\r" <> prefix <> s
     hFlush stdout
+
+
+simulateGame
+  :: Maybe (Wordlet Guess)
+  -> Wordlet Master
+  -> WordList Guess
+  -> WordList Master
+  -> [Wordlet Guess]
+simulateGame starting_guess master guess_list master_list =
+  case starting_guess of
+    Nothing -> go (bestGuess guess_list master_list)
+    Just wo -> go wo
+ where
+  go guess
+    | guess == coerce master = [guess]
+    | otherwise = guess : simulateGame
+      Nothing
+      master
+      guess_list
+      (filterMasters (guess `againstMaster` master) guess master_list)
+
+selectRandomWord :: WordList a -> IO (Wordlet a)
+selectRandomWord wordlist = do
+  i <- randomRIO (0, VV.length $ getWordList wordlist)
+  pure ((VV.! i) $ getWordList wordlist)

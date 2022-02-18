@@ -3,6 +3,7 @@ module Main where
 import           Wordle
 
 import           Colourista
+import           Control.Monad
 import           Data.FileEmbed
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
@@ -33,4 +34,22 @@ main = do
     \                                                  `^UU^^UU^  \n"
   infoMessage " Press Ctrl-C to exit at any time."
   runGame guessWords masterWords
+
+simulate :: IO ()
+simulate = do
+  masters <- replicateM 50 (selectRandomWord masterWords)
+  let results = map
+        (\master -> simulateGame (Just ("trace" :: Wordlet Guess))
+                                 master
+                                 guessWords
+                                 masterWords
+        )
+        masters
+      len = length <$> results
+  print results
+  print len
+  print (mean len)
+
+mean :: [Int] -> Double
+mean xs = fromIntegral (sum xs) / fromIntegral (length xs)
 
