@@ -264,22 +264,22 @@ runGame guesses masters =
 
   singleRound guess currentMasters = do
     outputStrLn
-      $ question
-          "What was the result? (type \"done\" if the guess was correct)\n\
-          \                        (type \"help\" for more information)"
+      $ question "What was the result? (type \"help\" for more information)"
     getUserInput $ \input -> case parseColors input of
-      Right colors -> pure $ Right $ filterMasters colors guess currentMasters
+      Right colors
+        | colors == "ggggg" -> do
+          outputStrLn $ formatWith [green, bold] "Congratulations!"
+          outputStrLn $ question "Would you like to play again? (yes/no)"
+          getUserInput $ \input' -> if
+            | input' `elem` ["y", "yes"] -> Right <$> runGame'
+            | input' `elem` ["n", "no"] -> Right <$> liftIO exitSuccess
+            | otherwise -> pure $ Left $ errmsg "Sorry, didn't get that."
+        | otherwise -> pure $ Right $ filterMasters colors guess currentMasters
       _ | input == "help" -> pure $ Left $ formatWith
         [blue]
         "  ⓘ  A valid response consists of 5 characters,\n\
         \     each of which is one of: 'x' (gray), 'y' (yellow), or 'g' (green)."
-      _ | input == "done" -> do
-        outputStrLn $ formatWith [green, bold] "Congratulations!"
-        outputStrLn $ question "Would you like to play again? (yes/no)"
-        getUserInput $ \input' -> if
-          | input' `elem` ["y", "yes"] -> Right <$> runGame'
-          | input' `elem` ["n", "no"] -> Right <$> liftIO exitSuccess
-          | otherwise -> pure $ Left $ errmsg "Sorry, didn't get that."
+
 
       Left err -> pure $ Left $ errmsg err
 
