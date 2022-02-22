@@ -2,11 +2,13 @@
 module Wordle
   ( Wordlet
   , parseWordList
+  , parseWordlet
   , WordList
   , runGame
   , WordletType(..)
   , simulateGame
   , selectRandomWord
+  , simulate
   ) where
 
 import           Colourista                     ( blue
@@ -122,13 +124,15 @@ newtype Colors = Colors (Vector 5 Color)
 
 {-# COMPLETE Wordlet #-}
 
+colorList :: Colors -> [Color]
+colorList (Colors v) = let (a, b, c, d, e) = toTuple v in [a, b, c, d, e]
+
 instance Show Colors where
-  show (Colors v) =
-    let (a, b, c, d, e) = toTuple v
-        toChar Gray   = 'X'
-        toChar Yellow = 'Y'
-        toChar Green  = 'G'
-    in  toChar <$> [a, b, c, d, e]
+  show colors = toChar <$> colorList colors
+   where
+    toChar Gray   = 'X'
+    toChar Yellow = 'Y'
+    toChar Green  = 'G'
 
 instance IsString Colors where
   fromString = toRight . parseColors . Text.pack
@@ -336,21 +340,44 @@ simulateGame
   -> Wordlet Master
   -> WordList Guess
   -> WordList Master
-  -> [Wordlet Guess]
+  -> [(Colors, Wordlet Guess)]
 simulateGame starting_guess master guess_list master_list =
   case starting_guess of
     Nothing -> go (bestGuess guess_list master_list)
     Just wo -> go wo
  where
   go guess
-    | guess == coerce master = [guess]
-    | otherwise = guess : simulateGame
-      Nothing
-      master
-      guess_list
-      (filterMasters (guess `againstMaster` master) guess master_list)
+    | guess == coerce master
+    = [("ggggg", guess)]
+    | otherwise
+    = let colors = (guess `againstMaster` master)
+      in  (colors, guess) : simulateGame
+            Nothing
+            master
+            guess_list
+            (filterMasters colors guess master_list)
 
 selectRandomWord :: WordList a -> IO (Wordlet a)
 selectRandomWord wordlist = do
   i <- randomRIO (0, VV.length $ getWordList wordlist)
   pure ((VV.! i) $ getWordList wordlist)
+
+colorToEmoji :: Color -> Char
+colorToEmoji Gray   = '⬛'
+colorToEmoji Yellow = '🟨'
+colorToEmoji Green  = '🟩'
+
+simulate :: WordList Guess -> WordList Master -> Wordlet Master -> IO ()
+simulate guessWords masterWords master =
+  putStr $ ("🐢\nWordle XXX " <> show (length result) <> "/6\n\n") <> formatted
+ where
+  result =
+    simulateGame (Just ("raise" :: Wordlet Guess)) master guessWords masterWords
+  formatted = unlines $ formatRound <$> result
+  formatRound (colors, wordlet) =
+    (colorToEmoji <$> colorList colors)
+      <> " ||"
+      <> wordletToString wordlet
+      <> "||"
+
+

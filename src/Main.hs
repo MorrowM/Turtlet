@@ -3,14 +3,15 @@ module Main where
 import           Wordle
 
 import           Colourista
-import           Control.Monad
 import           Data.FileEmbed
 import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
+import qualified Data.Text                     as Text
+import           System.Environment             ( getArgs )
+import           System.Exit                    ( die )
 
 
 rightOrDie :: Either Text a -> a
-rightOrDie = either (error . T.unpack . ("error: " <>)) id
+rightOrDie = either (error . Text.unpack . ("error: " <>)) id
 
 embedWordList :: Text -> WordList wlty
 embedWordList = rightOrDie . parseWordList
@@ -26,30 +27,21 @@ guessWords =
 
 main :: IO ()
 main = do
-  greenMessage
-    "\n\n\
-    \        ┌────────────────────────────────────┐       .==.    \n\
-    \        │ Welcome to Turtlet, a Wordle Solver│    __/-^-^\\  \n\
-    \        └────────────────────────────────────┘   (' )^-^-^\\)\n\
-    \                                                  `^UU^^UU^  \n"
-  infoMessage " Press Ctrl-C to exit at any time."
-  runGame guessWords masterWords
+  args <- getArgs
+  case args of
+    [] -> mainGame
+    [simulateMe] | Right wordlet <- parseWordlet (Text.pack simulateMe) ->
+      simulate guessWords masterWords wordlet
+    _ -> die "error parsing command line args"
 
-simulate :: IO ()
-simulate = do
-  masters <- replicateM 50 (selectRandomWord masterWords)
-  let results = map
-        (\master -> simulateGame (Just ("trace" :: Wordlet Guess))
-                                 master
-                                 guessWords
-                                 masterWords
-        )
-        masters
-      len = length <$> results
-  print results
-  print len
-  print (mean len)
-
-mean :: [Int] -> Double
-mean xs = fromIntegral (sum xs) / fromIntegral (length xs)
+ where
+  mainGame = do
+    greenMessage
+      "\n\n\
+            \        ┌────────────────────────────────────┐       .==.    \n\
+            \        │ Welcome to Turtlet, a Wordle Solver│    __/-^-^\\  \n\
+            \        └────────────────────────────────────┘   (' )^-^-^\\)\n\
+            \                                                  `^UU^^UU^  \n"
+    infoMessage " Press Ctrl-C to exit at any time."
+    runGame guessWords masterWords
 
