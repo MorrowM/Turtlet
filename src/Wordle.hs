@@ -35,6 +35,7 @@ import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import           Data.Char                      ( isAsciiLower
                                                 , toLower
                                                 )
+import           Data.Char                      ( toUpper )
 import           Data.Coerce                    ( coerce )
 import           Data.Foldable                  ( for_ )
 import           Data.Function                  ( on )
@@ -376,8 +377,8 @@ simulate guessWords masterWords master =
   formatted = unlines $ formatRound <$> result
   formatRound (colors, wordlet) =
     (colorToEmoji <$> colorList colors)
-      <> " ||"
-      <> wordletToString wordlet
-      <> "||"
+      <> " ||`"
+      <> map toUpper (wordletToString wordlet)
+      <> "`||"
 
 
