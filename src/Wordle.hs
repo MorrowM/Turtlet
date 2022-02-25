@@ -34,8 +34,8 @@ import           Control.Monad                  ( forever
 import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import           Data.Char                      ( isAsciiLower
                                                 , toLower
+                                                , toUpper
                                                 )
-import           Data.Char                      ( toUpper )
 import           Data.Coerce                    ( coerce )
 import           Data.Foldable                  ( for_ )
 import           Data.Function                  ( on )
